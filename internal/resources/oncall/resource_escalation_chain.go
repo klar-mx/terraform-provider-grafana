@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	onCallAPI "github.com/grafana/amixr-api-go-client"
+	onCallAPI "github.com/klar-mx/amixr-api-go-client"
 	"github.com/grafana/terraform-provider-grafana/v3/internal/common"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"

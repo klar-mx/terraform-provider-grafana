@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	onCallAPI "github.com/grafana/amixr-api-go-client"
+	onCallAPI "github.com/klar-mx/amixr-api-go-client"
 	"github.com/grafana/grafana-com-public-clients/go/gcom"
 	goapi "github.com/grafana/grafana-openapi-client-go/client"
 	"github.com/grafana/machine-learning-go-client/mlapi"

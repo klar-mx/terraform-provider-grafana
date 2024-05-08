@@ -9,7 +9,6 @@ require (
 	github.com/fatih/color v1.17.0
 	github.com/go-openapi/runtime v0.28.0
 	github.com/go-openapi/strfmt v0.23.0
-	github.com/klar-mx/amixr-api-go-client v0.0.12-0.20240503084500-f6549ed6bf42 // main branch
 	github.com/grafana/grafana-com-public-clients/go/gcom v0.0.0-20240322153219-42c6a1d2bcab
 	github.com/grafana/grafana-openapi-client-go v0.0.0-20240523010106-657d101fcbd9
 	github.com/grafana/machine-learning-go-client v0.7.0
@@ -30,6 +29,7 @@ require (
 	github.com/hashicorp/terraform-plugin-go v0.23.0
 	github.com/hashicorp/terraform-plugin-mux v0.16.0
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.34.0
+	github.com/klar-mx/amixr-api-go-client v0.0.12-0.20240508091340-89bd58d788b9 // main branch
 	github.com/stretchr/testify v1.9.0
 	github.com/tmccombs/hcl2json v0.6.3
 	github.com/urfave/cli/v2 v2.27.2
@@ -77,7 +77,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/flatbuffers v23.5.26+incompatible // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
-	github.com/google/go-querystring v1.0.0 // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grafana/grafana-plugin-sdk-go v0.235.0 // indirect
@@ -162,10 +162,16 @@ require (
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.26.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
+<<<<<<< HEAD
 	golang.org/x/sys v0.21.0 // indirect
 	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
+=======
+	golang.org/x/sys v0.19.0 // indirect
+	golang.org/x/time v0.5.0 // indirect
+	golang.org/x/tools v0.19.0 // indirect
+>>>>>>> e9b9ffd3 (update mixr dep)
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240415180920-8c6c420018be // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240415180920-8c6c420018be // indirect

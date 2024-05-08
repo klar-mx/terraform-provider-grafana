@@ -161,7 +161,26 @@ func createCloudClient(client *common.Client, providerConfig ProviderConfig) err
 }
 
 func createOnCallClient(providerConfig ProviderConfig) (*onCallAPI.Client, error) {
-	return onCallAPI.New(providerConfig.OncallURL.ValueString(), providerConfig.OncallAccessToken.ValueString())
+	tlsClientConfig, err := parseTLSconfig(providerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	var client *onCallAPI.Client
+	client, err = onCallAPI.New(providerConfig.OncallURL.ValueString(), providerConfig.OncallAccessToken.ValueString())
+	if err != nil {
+		return nil, err
+	}
+
+	retryClient := retryablehttp.NewClient()
+	retryClient.HTTPClient = &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsClientConfig,
+		},
+	}
+	client.Client = retryClient
+
+	return client, nil
 }
 
 // Sets a custom HTTP Header on all requests coming from the Grafana Terraform Provider to Grafana-Terraform-Provider: true

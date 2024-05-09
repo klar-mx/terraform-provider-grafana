@@ -166,8 +166,7 @@ func createOnCallClient(providerConfig ProviderConfig) (*onCallAPI.Client, error
 		return nil, err
 	}
 
-	var client *onCallAPI.Client
-	client, err = onCallAPI.New(providerConfig.OncallURL.ValueString(), providerConfig.OncallAccessToken.ValueString())
+	onCallClient, err := onCallAPI.New(providerConfig.OncallURL.ValueString(), providerConfig.OncallAccessToken.ValueString())
 	if err != nil {
 		return nil, err
 	}
@@ -178,9 +177,9 @@ func createOnCallClient(providerConfig ProviderConfig) (*onCallAPI.Client, error
 			TLSClientConfig: tlsClientConfig,
 		},
 	}
-	client.Client = retryClient
+	onCallClient.Client = retryClient
 
-	return client, nil
+	return onCallClient, nil
 }
 
 // Sets a custom HTTP Header on all requests coming from the Grafana Terraform Provider to Grafana-Terraform-Provider: true

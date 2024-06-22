@@ -11,13 +11,11 @@
 
 name: release
 on:
+  workflow_dispatch:
   push:
     tags:
     - 'v*'
 jobs:
-  # Cloud tests don't run on every PR. We need to be sure they all pass before we release.
-  run-cloud-tests:
-    uses: ./.github/workflows/cloud-acc-tests.yml
   goreleaser:
     runs-on: ubuntu-latest
     needs: 

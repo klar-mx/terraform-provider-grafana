@@ -3,7 +3,7 @@ package oncall
 import (
 	"context"
 
-	onCallAPI "github.com/grafana/amixr-api-go-client"
+	onCallAPI "github.com/klar-mx/amixr-api-go-client"
 	"github.com/grafana/terraform-provider-grafana/v3/internal/common"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"

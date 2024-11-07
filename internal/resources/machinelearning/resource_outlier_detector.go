@@ -122,7 +122,9 @@ Visit https://grafana.com/docs/grafana-cloud/machine-learning/outlier-detection/
 		"grafana_machine_learning_outlier_detector",
 		resourceOutlierDetectorID,
 		schema,
-	).WithLister(lister(listOutliers))
+	).
+		WithLister(lister(listOutliers)).
+		WithPreferredResourceNameField("name")
 }
 
 func listOutliers(ctx context.Context, client *mlapi.Client) ([]string, error) {
@@ -186,11 +188,7 @@ func resourceOutlierUpdate(ctx context.Context, d *schema.ResourceData, meta int
 func resourceOutlierDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	c := meta.(*common.Client).MLAPI
 	err := c.DeleteOutlierDetector(ctx, d.Id())
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	d.SetId("")
-	return nil
+	return diag.FromErr(err)
 }
 
 func convertToSetStructure(al mlapi.OutlierAlgorithm) []interface{} {
@@ -241,7 +239,7 @@ func makeMLOutlier(d *schema.ResourceData, meta interface{}) (mlapi.OutlierDetec
 		DatasourceUID:  d.Get("datasource_uid").(string),
 		DatasourceType: d.Get("datasource_type").(string),
 		QueryParams:    d.Get("query_params").(map[string]interface{}),
-		Interval:       uint(d.Get("interval").(int)),
+		Interval:       uint(d.Get("interval").(int)), //nolint:gosec
 		Algorithm:      algorithm,
 	}, nil
 }

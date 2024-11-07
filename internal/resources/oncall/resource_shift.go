@@ -3,7 +3,6 @@ package oncall
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
@@ -106,6 +105,12 @@ func resourceOnCallShift() *common.Resource {
 					"interval",
 				},
 			},
+			"until": {
+				Type:         schema.TypeString,
+				Optional:     true,
+				ValidateFunc: validation.StringIsNotEmpty,
+				Description:  "The end time of recurrent on-call shifts (endless if null). This parameter takes a date format as yyyy-MM-dd'T'HH:mm:ss (for example \"2020-09-05T08:00:00\")",
+			},
 			"users": {
 				Type: schema.TypeSet,
 				Elem: &schema.Schema{
@@ -187,7 +192,9 @@ func resourceOnCallShift() *common.Resource {
 		"grafana_oncall_on_call_shift",
 		resourceID,
 		schema,
-	).WithLister(oncallListerFunction(listShifts))
+	).
+		WithLister(oncallListerFunction(listShifts)).
+		WithPreferredResourceNameField("name")
 }
 
 func listShifts(client *onCallAPI.Client, listOptions onCallAPI.ListOptions) (ids []string, nextPage *string, err error) {
@@ -293,10 +300,26 @@ func resourceOnCallShiftCreate(ctx context.Context, d *schema.ResourceData, clie
 	rollingUsersData, rollingUsersOk := d.GetOk(rollingUsers)
 	if rollingUsersOk {
 		if typeData == rollingUsers {
+			listSet := rollingUsersData.([]interface{})
+			for _, set := range listSet {
+				if set == nil {
+					return diag.Errorf("`rolling_users` can not include an empty group")
+				}
+			}
 			rollingUsersDataSlice := common.ListOfSetsToStringSlice(rollingUsersData.([]interface{}))
 			createOptions.RollingUsers = &rollingUsersDataSlice
 		} else {
 			return diag.Errorf("`rolling_users` can not be set with type: %s, use `users` field instead", typeData)
+		}
+	}
+
+	untilData, untilOk := d.GetOk("until")
+	if untilOk {
+		if typeData == singleEvent {
+			return diag.Errorf("`until` can not be set with type: %s", typeData)
+		} else {
+			u := untilData.(string)
+			createOptions.Until = &u
 		}
 	}
 
@@ -411,6 +434,16 @@ func resourceOnCallShiftUpdate(ctx context.Context, d *schema.ResourceData, clie
 		}
 	}
 
+	untilData, untilOk := d.GetOk("until")
+	if untilOk {
+		if typeData == singleEvent {
+			return diag.Errorf("`until` can not be set with type: %s", typeData)
+		} else {
+			u := untilData.(string)
+			updateOptions.Until = &u
+		}
+	}
+
 	timeZoneData, timeZoneOk := d.GetOk("time_zone")
 	if timeZoneOk {
 		tz := timeZoneData.(string)
@@ -420,6 +453,12 @@ func resourceOnCallShiftUpdate(ctx context.Context, d *schema.ResourceData, clie
 	rollingUsersData, rollingUsersOk := d.GetOk(rollingUsers)
 	if rollingUsersOk {
 		if typeData == rollingUsers {
+			listSet := rollingUsersData.([]interface{})
+			for _, set := range listSet {
+				if set == nil {
+					return diag.Errorf("`rolling_users` can not include an empty group")
+				}
+			}
 			rollingUsersDataSlice := common.ListOfSetsToStringSlice(rollingUsersData.([]interface{}))
 			updateOptions.RollingUsers = &rollingUsersDataSlice
 		} else {
@@ -448,9 +487,7 @@ func resourceOnCallShiftRead(ctx context.Context, d *schema.ResourceData, client
 	onCallShift, r, err := client.OnCallShifts.GetOnCallShift(d.Id(), options)
 	if err != nil {
 		if r != nil && r.StatusCode == http.StatusNotFound {
-			log.Printf("[WARN] removing on-call shift %s from state because it no longer exists", d.Id())
-			d.SetId("")
-			return nil
+			return common.WarnMissing("on-call shift", d)
 		}
 		return diag.FromErr(err)
 	}
@@ -460,6 +497,7 @@ func resourceOnCallShiftRead(ctx context.Context, d *schema.ResourceData, client
 	d.Set("type", onCallShift.Type)
 	d.Set("level", onCallShift.Level)
 	d.Set("start", onCallShift.Start)
+	d.Set("until", onCallShift.Until)
 	d.Set("duration", onCallShift.Duration)
 	d.Set("frequency", onCallShift.Frequency)
 	d.Set("week_start", onCallShift.WeekStart)
@@ -478,11 +516,5 @@ func resourceOnCallShiftRead(ctx context.Context, d *schema.ResourceData, client
 func resourceOnCallShiftDelete(ctx context.Context, d *schema.ResourceData, client *onCallAPI.Client) diag.Diagnostics {
 	options := &onCallAPI.DeleteOnCallShiftOptions{}
 	_, err := client.OnCallShifts.DeleteOnCallShift(d.Id(), options)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	d.SetId("")
-
-	return nil
+	return diag.FromErr(err)
 }

@@ -74,10 +74,11 @@ Required access policy scopes:
 
 		Schema: map[string]*schema.Schema{
 			"region": {
-				Type:        schema.TypeString,
-				Required:    true,
-				ForceNew:    true,
-				Description: "Region where the API is deployed. Generally where the stack is deployed. Use the region list API to get the list of available regions: https://grafana.com/docs/grafana-cloud/developer-resources/api-reference/cloud-api/#list-regions.",
+				Type:         schema.TypeString,
+				Required:     true,
+				ForceNew:     true,
+				Description:  "Region where the API is deployed. Generally where the stack is deployed. Use the region list API to get the list of available regions: https://grafana.com/docs/grafana-cloud/developer-resources/api-reference/cloud-api/#list-regions.",
+				ValidateFunc: validation.StringIsNotEmpty,
 			},
 			"name": {
 				Type:        schema.TypeString,
@@ -135,7 +136,9 @@ Required access policy scopes:
 		"grafana_cloud_access_policy",
 		resourceAccessPolicyID,
 		schema,
-	).WithLister(cloudListerFunction(listAccessPolicies))
+	).
+		WithLister(cloudListerFunction(listAccessPolicies)).
+		WithPreferredResourceNameField("name")
 }
 
 func listAccessPolicies(ctx context.Context, client *gcom.APIClient, data *ListerData) ([]string, error) {

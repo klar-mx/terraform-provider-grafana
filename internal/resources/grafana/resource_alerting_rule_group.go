@@ -34,7 +34,7 @@ func resourceRuleGroup() *common.Resource {
 		Description: `
 Manages Grafana Alerting rule groups.
 
-* [Official documentation](https://grafana.com/docs/grafana/latest/alerting/alerting-rules/)
+* [Official documentation](https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/terraform-provisioning/)
 * [HTTP API](https://grafana.com/docs/grafana/latest/developers/http_api/alerting_provisioning/#alert-rules)
 
 This resource requires Grafana 9.1.0 or later.
@@ -187,7 +187,7 @@ This resource requires Grafana 9.1.0 or later.
 							Type:        schema.TypeMap,
 							Optional:    true,
 							Default:     map[string]interface{}{},
-							Description: "Key-value pairs of metadata to attach to the alert rule that may add user-defined context, but cannot be used for matching, grouping, or routing.",
+							Description: "Key-value pairs of metadata to attach to the alert rule. They add additional information, such as a `summary` or `runbook_url`, to help identify and investigate alerts. The `dashboardUId` and `panelId` annotations, which link alerts to a panel, must be set together.",
 							Elem: &schema.Schema{
 								Type: schema.TypeString,
 							},
@@ -255,37 +255,28 @@ This resource requires Grafana 9.1.0 or later.
 		"grafana_rule_group",
 		resourceRuleGroupID,
 		schema,
-	).WithLister(listerFunction(listRuleGroups))
+	).WithLister(listerFunctionOrgResource(listRuleGroups))
 }
 
-func listRuleGroups(ctx context.Context, client *goapi.GrafanaHTTPAPI, data *ListerData) ([]string, error) {
-	orgIDs, err := data.OrgIDs(client)
-	if err != nil {
-		return nil, err
-	}
-
+func listRuleGroups(ctx context.Context, client *goapi.GrafanaHTTPAPI, orgID int64) ([]string, error) {
 	idMap := map[string]bool{}
-	for _, orgID := range orgIDs {
-		client = client.Clone().WithOrgID(orgID)
-
-		// Retry if the API returns 500 because it may be that the alertmanager is not ready in the org yet.
-		// The alertmanager is provisioned asynchronously when the org is created.
-		if err := retry.RetryContext(ctx, 2*time.Minute, func() *retry.RetryError {
-			resp, err := client.Provisioning.GetAlertRules()
-			if err != nil {
-				if orgID > 1 && (err.(*runtime.APIError).IsCode(500) || err.(*runtime.APIError).IsCode(403)) {
-					return retry.RetryableError(err)
-				}
-				return retry.NonRetryableError(err)
+	// Retry if the API returns 500 because it may be that the alertmanager is not ready in the org yet.
+	// The alertmanager is provisioned asynchronously when the org is created.
+	if err := retry.RetryContext(ctx, 2*time.Minute, func() *retry.RetryError {
+		resp, err := client.Provisioning.GetAlertRules()
+		if err != nil {
+			if orgID > 1 && (err.(*runtime.APIError).IsCode(500) || err.(*runtime.APIError).IsCode(403)) {
+				return retry.RetryableError(err)
 			}
-
-			for _, rule := range resp.Payload {
-				idMap[resourceRuleGroupID.Make(orgID, rule.FolderUID, rule.RuleGroup)] = true
-			}
-			return nil
-		}); err != nil {
-			return nil, err
+			return retry.NonRetryableError(err)
 		}
+
+		for _, rule := range resp.Payload {
+			idMap[resourceRuleGroupID.Make(orgID, rule.FolderUID, rule.RuleGroup)] = true
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	var ids []string

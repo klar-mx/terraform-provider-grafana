@@ -3,7 +3,6 @@ package oncall
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
@@ -49,7 +48,7 @@ var integrationTypesVerbal = strings.Join(integrationTypes, ", ")
 func resourceIntegration() *common.Resource {
 	schema := &schema.Resource{
 		Description: `
-* [Official documentation](https://grafana.com/docs/oncall/latest/integrations/)
+* [Official documentation](https://grafana.com/docs/oncall/latest/configure/integrations/)
 * [HTTP API](https://grafana.com/docs/oncall/latest/oncall-api-reference/)
 `,
 
@@ -195,7 +194,8 @@ func resourceIntegration() *common.Resource {
 						"slack":           onCallTemplate("Templates for Slack.", true, true),
 						"web":             onCallTemplate("Templates for Web.", true, true),
 						"telegram":        onCallTemplate("Templates for Telegram.", true, true),
-						"microsoft_teams": onCallTemplate("Templates for Microsoft Teams.", true, true),
+						"microsoft_teams": onCallTemplate("Templates for Microsoft Teams. **NOTE**: Microsoft Teams templates are only available on Grafana Cloud.", true, true),
+						"mobile_app":      onCallTemplate("Templates for Mobile app push notifications.", true, false),
 						"phone_call":      onCallTemplate("Templates for Phone Call.", false, false),
 						"sms":             onCallTemplate("Templates for SMS.", false, false),
 						"email":           onCallTemplate("Templates for Email.", true, false),
@@ -240,7 +240,9 @@ func resourceIntegration() *common.Resource {
 		"grafana_oncall_integration",
 		resourceID,
 		schema,
-	).WithLister(oncallListerFunction(listIntegrations))
+	).
+		WithLister(oncallListerFunction(listIntegrations)).
+		WithPreferredResourceNameField("name")
 }
 
 func listIntegrations(client *onCallAPI.Client, listOptions onCallAPI.ListOptions) (ids []string, nextPage *string, err error) {
@@ -345,9 +347,7 @@ func resourceIntegrationRead(ctx context.Context, d *schema.ResourceData, client
 	integration, r, err := client.Integrations.GetIntegration(d.Id(), options)
 	if err != nil {
 		if r != nil && r.StatusCode == http.StatusNotFound {
-			log.Printf("[WARN] removing integreation %s from state because it no longer exists", d.Get("name").(string))
-			d.SetId("")
-			return nil
+			return common.WarnMissing("integration", d)
 		}
 		return diag.FromErr(err)
 	}
@@ -365,13 +365,7 @@ func resourceIntegrationRead(ctx context.Context, d *schema.ResourceData, client
 func resourceIntegrationDelete(ctx context.Context, d *schema.ResourceData, client *onCallAPI.Client) diag.Diagnostics {
 	options := &onCallAPI.DeleteIntegrationOptions{}
 	_, err := client.Integrations.DeleteIntegration(d.Id(), options)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	d.SetId("")
-
-	return nil
+	return diag.FromErr(err)
 }
 
 func flattenRouteSlack(in *onCallAPI.SlackRoute) []map[string]interface{} {
@@ -538,6 +532,15 @@ func flattenTemplates(in *onCallAPI.Templates) []map[string]interface{} {
 			add = true
 		}
 	}
+
+	if in.MobileApp != nil {
+		flattenMobileAppTemplate := flattenTitleMessageTemplate(in.MobileApp)
+		if len(flattenMobileAppTemplate) > 0 {
+			out["mobile_app"] = flattenMobileAppTemplate
+			add = true
+		}
+	}
+
 	if add {
 		templates = append(templates, out)
 	}
@@ -677,6 +680,12 @@ func expandTemplates(input []interface{}) *onCallAPI.Templates {
 			templates.Email = nil
 		} else {
 			templates.Email = expandTitleMessageTemplate(inputMap["email"].([]interface{}))
+		}
+
+		if inputMap["mobile_app"] == nil {
+			templates.MobileApp = nil
+		} else {
+			templates.MobileApp = expandTitleMessageTemplate(inputMap["mobile_app"].([]interface{}))
 		}
 	}
 	return &templates

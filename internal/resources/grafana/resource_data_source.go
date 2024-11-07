@@ -36,7 +36,20 @@ source selected (via the 'type' argument).
 		SchemaVersion: 1,
 
 		Importer: &schema.ResourceImporter{
-			StateContext: schema.ImportStatePassthroughContext,
+			StateContext: func(ctx context.Context, d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
+				client, _, idStr := OAPIClientFromExistingOrgResource(meta, d.Id())
+
+				resp, err := client.Datasources.GetDataSourceByUID(idStr)
+				if err != nil {
+					return nil, err
+				}
+
+				if resp.Payload.ReadOnly {
+					return nil, fmt.Errorf("this Grafana data source is read-only. It cannot be imported as a resource. Use the `data_grafana_data_source` data source instead")
+				}
+
+				return schema.ImportStatePassthroughContext(ctx, d, meta)
+			},
 		},
 
 		Schema: map[string]*schema.Schema{
@@ -114,7 +127,9 @@ source selected (via the 'type' argument).
 		"grafana_data_source",
 		orgResourceIDString("uid"),
 		schema,
-	).WithLister(listerFunction(listDatasources))
+	).
+		WithLister(listerFunctionOrgResource(listDatasources)).
+		WithPreferredResourceNameField("name")
 }
 
 func datasourceHTTPHeadersAttribute() *schema.Schema {
@@ -138,6 +153,11 @@ func datasourceJSONDataAttribute() *schema.Schema {
 			if strings.Contains(i.(string), "httpHeaderName") {
 				return nil, []error{
 					errors.New("httpHeaderName{num} is a reserved key and cannot be used in JSON data. Use the http_headers attribute instead"),
+				}
+			}
+			if strings.Contains(i.(string), "teamHttpHeaders") {
+				return nil, []error{
+					errors.New("teamHttpHeaders is a reserved key and cannot be used in JSON data. Use the data_source_config_lbac_rules resource instead"),
 				}
 			}
 			return validation.StringIsJSON(i, s)
@@ -182,23 +202,18 @@ func datasourceSecureJSONDataAttribute() *schema.Schema {
 	}
 }
 
-func listDatasources(ctx context.Context, client *goapi.GrafanaHTTPAPI, data *ListerData) ([]string, error) {
-	orgIDs, err := data.OrgIDs(client)
+func listDatasources(ctx context.Context, client *goapi.GrafanaHTTPAPI, orgID int64) ([]string, error) {
+	var ids []string
+	resp, err := client.Datasources.GetDataSources()
 	if err != nil {
 		return nil, err
 	}
 
-	var ids []string
-	for _, orgID := range orgIDs {
-		client = client.Clone().WithOrgID(orgID)
-		resp, err := client.Datasources.GetDataSources()
-		if err != nil {
-			return nil, err
+	for _, ds := range resp.Payload {
+		if ds.ReadOnly {
+			continue
 		}
-
-		for _, ds := range resp.Payload {
-			ids = append(ids, MakeOrgResourceID(orgID, ds.UID))
-		}
+		ids = append(ids, MakeOrgResourceID(orgID, ds.UID))
 	}
 
 	return ids, nil
@@ -408,6 +423,8 @@ func removeHeadersFromJSONData(input map[string]interface{}) (map[string]interfa
 			jsonData[dataName] = dataValue
 		}
 	}
+	// for teamhttpheaders, we do not set it in the state and we do not want to return it in the diff
+	delete(jsonData, "teamHttpHeaders")
 
 	return jsonData, headers
 }

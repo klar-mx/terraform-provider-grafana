@@ -104,7 +104,9 @@ A job defines the queries and model parameters for a machine learning task.
 		"grafana_machine_learning_job",
 		resourceJobID,
 		schema,
-	).WithLister(lister(listJobs))
+	).
+		WithLister(lister(listJobs)).
+		WithPreferredResourceNameField("name")
 }
 
 func listJobs(ctx context.Context, client *mlapi.Client) ([]string, error) {
@@ -175,11 +177,7 @@ func resourceJobUpdate(ctx context.Context, d *schema.ResourceData, meta interfa
 func resourceJobDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	c := meta.(*common.Client).MLAPI
 	err := c.DeleteJob(ctx, d.Id())
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	d.SetId("")
-	return nil
+	return diag.FromErr(err)
 }
 
 func makeMLJob(d *schema.ResourceData, meta interface{}) (mlapi.Job, error) {
@@ -192,11 +190,11 @@ func makeMLJob(d *schema.ResourceData, meta interface{}) (mlapi.Job, error) {
 		DatasourceUID:     d.Get("datasource_uid").(string),
 		DatasourceType:    d.Get("datasource_type").(string),
 		QueryParams:       d.Get("query_params").(map[string]interface{}),
-		Interval:          uint(d.Get("interval").(int)),
+		Interval:          uint(d.Get("interval").(int)), //nolint:gosec
 		Algorithm:         "grafana_prophet_1_0_1",
 		HyperParams:       d.Get("hyper_params").(map[string]interface{}),
 		CustomLabels:      d.Get("custom_labels").(map[string]interface{}),
-		TrainingWindow:    uint(d.Get("training_window").(int)),
+		TrainingWindow:    uint(d.Get("training_window").(int)), //nolint:gosec
 		TrainingFrequency: uint(24 * time.Hour / time.Second),
 		Holidays:          common.ListToStringSlice(d.Get("holidays").([]interface{})),
 	}, nil

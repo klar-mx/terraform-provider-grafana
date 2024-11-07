@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 
@@ -271,6 +270,7 @@ var (
 				Description: "Token for use with bearer authorization header.",
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 			},
 			"proxy_url": {
 				Description: "Proxy URL.",
@@ -360,6 +360,7 @@ var (
 				Description: "Basic auth password.",
 				Type:        schema.TypeString,
 				Required:    true,
+				Sensitive:   true,
 			},
 		},
 	}
@@ -791,28 +792,28 @@ multiple checks for a single endpoint to check different capabilities.
 		"grafana_synthetic_monitoring_check",
 		resourceCheckID,
 		schema,
-	)
+	).
+		WithLister(listChecks).
+		WithPreferredResourceNameField("job")
 }
 
-// TODO: Fix lister
-// .WithLister(listChecks)
-// func listChecks(ctx context.Context, client *common.Client, data any) ([]string, error) {
-// 	smClient := client.SMAPI
-// 	if smClient == nil {
-// 		return nil, fmt.Errorf("client not configured for SM API")
-// 	}
+func listChecks(ctx context.Context, client *common.Client, data any) ([]string, error) {
+	smClient := client.SMAPI
+	if smClient == nil {
+		return nil, fmt.Errorf("client not configured for SM API")
+	}
 
-// 	checkList, err := smClient.ListChecks(ctx)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	checkList, err := smClient.ListChecks(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-// 	var ids []string
-// 	for _, check := range checkList {
-// 		ids = append(ids, strconv.FormatInt(check.Id, 10))
-// 	}
-// 	return ids, nil
-// }
+	var ids []string
+	for _, check := range checkList {
+		ids = append(ids, strconv.FormatInt(check.Id, 10))
+	}
+	return ids, nil
+}
 
 func resourceCheckCreate(ctx context.Context, d *schema.ResourceData, c *smapi.Client) diag.Diagnostics {
 	chk, err := makeCheck(d)
@@ -836,9 +837,7 @@ func resourceCheckRead(ctx context.Context, d *schema.ResourceData, c *smapi.Cli
 	chk, err := c.GetCheck(ctx, id.(int64))
 	if err != nil {
 		if strings.Contains(err.Error(), "404 Not Found") {
-			log.Printf("[WARN] removing check %s from state because it no longer exists", d.Id())
-			d.SetId("")
-			return nil
+			return common.WarnMissing("check", d)
 		}
 		return diag.FromErr(err)
 	}
@@ -1166,17 +1165,12 @@ func resourceCheckUpdate(ctx context.Context, d *schema.ResourceData, c *smapi.C
 }
 
 func resourceCheckDelete(ctx context.Context, d *schema.ResourceData, c *smapi.Client) diag.Diagnostics {
-	var diags diag.Diagnostics
 	id, err := resourceCheckID.Single(d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
 	err = c.DeleteCheck(ctx, id.(int64))
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	d.SetId("")
-	return diags
+	return diag.FromErr(err)
 }
 
 // makeCheck populates an instance of sm.Check. We need this for create and
@@ -1438,7 +1432,7 @@ func makeCheckSettings(settings map[string]interface{}) (sm.CheckSettings, error
 			IpVersion:       sm.IpVersion(sm.IpVersion_value[d["ip_version"].(string)]),
 			SourceIpAddress: d["source_ip_address"].(string),
 			Server:          d["server"].(string),
-			Port:            int32(d["port"].(int)),
+			Port:            int32(d["port"].(int)), //nolint:gosec
 			RecordType:      sm.DnsRecordType(sm.DnsRecordType_value[d["record_type"].(string)]),
 			Protocol:        sm.DnsProtocol(sm.DnsProtocol_value[d["protocol"].(string)]),
 			ValidRCodes:     common.SetToStringSlice(d["valid_r_codes"].(*schema.Set)),
@@ -1473,6 +1467,7 @@ func makeCheckSettings(settings map[string]interface{}) (sm.CheckSettings, error
 			NoFollowRedirects:          h["no_follow_redirects"].(bool),
 			BearerToken:                h["bearer_token"].(string),
 			ProxyURL:                   h["proxy_url"].(string),
+			ProxyConnectHeaders:        common.SetToStringSlice(h["proxy_connect_headers"].(*schema.Set)),
 			FailIfSSL:                  h["fail_if_ssl"].(bool),
 			FailIfNotSSL:               h["fail_if_not_ssl"].(bool),
 			ValidHTTPVersions:          common.SetToStringSlice(h["valid_http_versions"].(*schema.Set)),
@@ -1492,7 +1487,7 @@ func makeCheckSettings(settings map[string]interface{}) (sm.CheckSettings, error
 		}
 		if h["valid_status_codes"].(*schema.Set).Len() > 0 {
 			for _, v := range h["valid_status_codes"].(*schema.Set).List() {
-				cs.Http.ValidStatusCodes = append(cs.Http.ValidStatusCodes, int32(v.(int)))
+				cs.Http.ValidStatusCodes = append(cs.Http.ValidStatusCodes, int32(v.(int))) //nolint:gosec
 			}
 		}
 		headerMatch := func(hms *schema.Set) []sm.HeaderMatch {
@@ -1599,7 +1594,10 @@ func resourceCheckCustomizeDiff(ctx context.Context, diff *schema.ResourceDiff, 
 	if len(settingsList) == 0 {
 		return fmt.Errorf("at least one check setting must be defined")
 	}
-	settings := settingsList[0].(map[string]interface{})
+	settings, ok := settingsList[0].(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("at least one check setting must be defined")
+	}
 
 	count := 0
 	for k := range syntheticMonitoringCheckSettings.Schema {

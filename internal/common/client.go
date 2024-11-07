@@ -10,10 +10,13 @@ import (
 	"github.com/grafana/grafana-com-public-clients/go/gcom"
 	goapi "github.com/grafana/grafana-openapi-client-go/client"
 	"github.com/grafana/machine-learning-go-client/mlapi"
-	slo "github.com/grafana/slo-openapi-client/go"
+	"github.com/grafana/slo-openapi-client/go/slo"
 	SMAPI "github.com/grafana/synthetic-monitoring-api-go-client"
+	"github.com/grafana/terraform-provider-grafana/v3/internal/common/cloudproviderapi"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+
+	"github.com/grafana/terraform-provider-grafana/v3/internal/common/connectionsapi"
 )
 
 type Client struct {
@@ -22,11 +25,13 @@ type Client struct {
 	GrafanaAPI          *goapi.GrafanaHTTPAPI
 	GrafanaAPIConfig    *goapi.TransportConfig
 
-	GrafanaCloudAPI *gcom.APIClient
-	SMAPI           *SMAPI.Client
-	MLAPI           *mlapi.Client
-	OnCallClient    *onCallAPI.Client
-	SLOClient       *slo.APIClient
+	GrafanaCloudAPI      *gcom.APIClient
+	SMAPI                *SMAPI.Client
+	MLAPI                *mlapi.Client
+	OnCallClient         *onCallAPI.Client
+	SLOClient            *slo.APIClient
+	CloudProviderAPI     *cloudproviderapi.Client
+	ConnectionsAPIClient *connectionsapi.Client
 
 	alertingMutex sync.Mutex
 }
